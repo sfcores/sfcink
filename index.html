@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星际档案控制台 - SFC.INK</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 针对主页多卡片排版的专属HUD样式微调 */
+        body {
+            overflow-y: auto; /* 主页允许垂直滚动以浏览更多恒星 */
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px;
+            width: 100%;
+        }
+
+        .welcome-hero {
+            margin-bottom: 40px;
+            border: 1px solid rgba(0, 47, 167, 0.3);
+            background: linear-gradient(135deg, rgba(0, 47, 167, 0.1), transparent);
+            padding: 30px;
+            border-radius: 4px;
+            backdrop-filter: blur(5px);
+        }
+
+        .welcome-hero h2 {
+            font-size: 24px;
+            color: var(--hud-cyan);
+            margin-bottom: 10px;
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+
+        .welcome-hero p {
+            color: rgba(248, 250, 252, 0.6);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* 恒星档案卡片网格布局 */
+        .star-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .star-card {
+            border: 1px solid rgba(0, 47, 167, 0.3);
+            background: rgba(3, 7, 18, 0.85);
+            border-radius: 4px;
+            padding: 25px;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 47, 167, 0.1);
+        }
+
+        /* 鼠标悬停时的HUD亮起特效 */
+        .star-card:hover {
+            border-color: var(--hud-cyan);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* 照搬原版 archive-box 的边角高亮设计 */
+        .star-card::before {
+            content: ''; position: absolute; top: -1px; left: -1px; width: 10px; height: 10px;
+            border-top: 2px solid rgba(0, 243, 255, 0.3); border-left: 2px solid rgba(0, 243, 255, 0.3);
+            transition: border-color 0.3s;
+        }
+        .star-card:hover::before {
+            border-color: var(--hud-cyan);
+        }
+
+        .star-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .star-title {
+            font-size: 18px;
+            color: var(--text-white);
+            font-weight: 500;
+        }
+
+        .star-subtitle {
+            font-size: 12px;
+            color: rgba(248, 250, 252, 0.4);
+            margin-top: 4px;
+        }
+
+        .star-type-badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 2px;
+            font-weight: bold;
+        }
+
+        /* 不同光谱类型的动态颜色标签 */
+        .badge-o { background: rgba(59, 130, 246, 0.2); color: #3b82f6; border: 1px solid #3b82f6; }
+        .badge-b { background: rgba(96, 165, 250, 0.2); color: #60a5fa; border: 1px solid #60a5fa; }
+        .badge-a { background: rgba(191, 219, 254, 0.2); color: #bfdbfe; border: 1px solid #bfdbfe; }
+        .badge-k { background: rgba(249, 115, 22, 0.2); color: #f97316; border: 1px solid #f97316; }
+
+        .preview-list {
+            list-style: none;
+            margin-bottom: 20px;
+        }
+
+        .preview-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            padding: 6px 0;
+        }
+
+        .preview-label { color: rgba(248, 250, 252, 0.5); }
+        .preview-value { color: rgba(248, 250, 252, 0.85); }
+
+        /* HUD科技感按钮 */
+        .access-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 47, 167, 0.2);
+            border: 1px solid rgba(0, 47, 167, 0.6);
+            color: var(--hud-cyan);
+            text-align: center;
+            text-decoration: none;
+            font-size: 13px;
+            letter-spacing: 1px;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .access-btn:hover {
+            background: var(--klein-blue);
+            color: #ffffff;
+            border-color: var(--hud-cyan);
+            cursor: pointer;
+        }
+
+        /* 背景流体Canvas图层限制，防止遮挡内容点击 */
+        #bgCanvas {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -1;
+            background-color: #030712;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bgCanvas"></canvas>
+
+    <header>
+        <h1>STELLAR INDEX HUB // 星际档案总控制台 SFC.INK</h1>
+    </header>
+
+    <div class="main-container">
+        
+        <div class="welcome-hero">
+            <h2>SYSTEM READY // 导航准备就绪</h2>
+            <p>欢迎接入恒星光谱与物理形态展示矩阵。当前控制台已成功缓存 Ω 个核心恒星矢量档案。点击下方任意星体内核链接，系统将自动激活独立安全沙盒（在新标签页中渲染对应的 2D 高能发光与空间扁率模型）。</p>
+        </div>
+
+        <div class="star-grid">
+
+            <div class="star-card">
+                <div class="star-header">
+                    <div>
+                        <div class="star-title">室宿一</div>
+                        <div class="star-subtitle">飞马座α / Markab</div>
+                    </div>
+                    <span class="star-type-badge badge-a">A0 IV</span>
+                </div>
+                <ul class="preview-list">
+                    <li class="preview-item"><span class="preview-label">TYPE</span><span class="preview-value">主序星 (次巨星阶段)</span></li>
+                    <li class="preview-item"><span class="preview-label">MASS</span><span class="preview-value">3.5 M☉</span></li>
+                    <li class="preview-item"><span class="preview-label">OBLATENESS</span><span class="preview-value">0.00 (正圆)</span></li>
+                </ul>
+                <a href="markab.html" target="_blank" class="access-btn">ACCESS PROFILE // 接入档案</a>
+            </div>
+
+            <div class="star-card">
+                <div class="star-header">
+                    <div>
+                        <div class="star-title">天记星</div>
+                        <div class="star-subtitle">船帆座λ / Suhail</div>
+                    </div>
+                    <span class="star-type-badge badge-k">K4 III</span>
+                </div>
+                <ul class="preview-list">
+                    <li class="preview-item"><span class="preview-label">TYPE</span><span class="preview-value">红巨星 (明亮巨星)</span></li>
+                    <li class="preview-item"><span class="preview-label">MASS</span><span class="preview-value">8.5 M☉</span></li>
+                    <li class="preview-item"><span class="preview-label">OBLATENESS</span><span class="preview-value">0.00 (正圆)</span></li>
+                </ul>
+                <a href="suhail.html" target="_blank" class="access-btn">ACCESS PROFILE // 接入档案</a>
+            </div>
+
+            <div class="star-card">
+                <div class="star-header">
+                    <div>
+                        <div class="star-title">策星</div>
+                        <div class="star-subtitle">仙后座γ / Tsih</div>
+                    </div>
+                    <span class="star-type-badge badge-b">B0.5 IVe</span>
+                </div>
+                <ul class="preview-list">
+                    <li class="preview-item"><span class="preview-label">TYPE</span><span class="preview-value">爆发变星 (壳层星)</span></li>
+                    <li class="preview-item"><span class="preview-label">MASS</span><span class="preview-value">17.0 M☉</span></li>
+                    <li class="preview-item"><span class="preview-label">OBLATENESS</span><span class="preview-value">0.15 (自转扁球)</span></li>
+                </ul>
+                <a href="tsih.html" target="_blank" class="access-btn">ACCESS PROFILE // 接入档案</a>
+            </div>
+
+            <div class="star-card">
+                <div class="star-header">
+                    <div>
+                        <div class="star-title">斗宿六</div>
+                        <div class="star-subtitle">人马座ζAa / Ascella</div>
+                    </div>
+                    <span class="star-type-badge badge-a">A2.5 Va</span>
+                </div>
+                <ul class="preview-list">
+                    <li class="preview-item"><span class="preview-label">TYPE</span><span class="preview-value">联星主星 (主序星)</span></li>
+                    <li class="preview-item"><span class="preview-label">MASS</span><span class="preview-value">2.2 M☉</span></li>
+                    <li class="preview-item"><span class="preview-label">OBLATENESS</span><span class="preview-value">0.00 (正圆)</span></li>
+                </ul>
+                <a href="ascella.html" target="_blank" class="access-btn">ACCESS PROFILE // 接入档案</a>
+            </div>
+
+            <div class="star-card">
+                <div class="star-header">
+                    <div>
+                        <div class="star-title">弧矢增二十二</div>
+                        <div class="star-subtitle">船尾座ζ / Naos</div>
+                    </div>
+                    <span class="star-type-badge badge-o">O4 If</span>
+                </div>
+                <ul class="preview-list">
+                    <li class="preview-item"><span class="preview-label">TYPE</span><span class="preview-value">高能蓝超巨星</span></li>
+                    <li class="preview-item"><span class="preview-label">MASS</span><span class="preview-value">56.0 M☉</span></li>
+                    <li class="preview-item"><span class="preview-label">OBLATENESS</span><span class="preview-value">0.00 (高能正圆)</span></li>
+                </ul>
+                <a href="naos.html" target="_blank" class="access-btn">ACCESS PROFILE // 接入档案</a>
+            </div>
+
+        </div>
+
+        <div style="font-size: 12px; color: rgba(248, 250, 252, 0.3); text-align: center; padding: 20px 0; border-top: 1px solid rgba(255,255,255,0.05);">
+            © SFC.INK DEEP SPACE MATRIX PROGRAM // ALL DATA IS LOCALLY ENCRYPTED AND RENDERS VIA CANVAS2D.
+        </div>
+    </div>
+
+    <script src="draw.js"></script>
+    <script>
+        const canvas = document.getElementById('bgCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 主页只需要绘制背景粒子，不需要绘制中心恒星
+        // 因此我们将全局视觉变量设为 null，完美兼容 draw.js 的内部防御逻辑
+        window.currentActiveConfig = null;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // 初始化主页星空动画
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            initBackgroundStars();
+        });
+
+        resizeCanvas();
+        initBackgroundStars();
+        animationEngineLoop(); // 启动 draw.js 的主循环引擎
+    </script>
+</body>
+</html>

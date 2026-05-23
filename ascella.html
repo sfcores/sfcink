@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星设展示系统 - SFC.INK</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>STARSET PROFILE // 星设档案库 SFC.INK</h1>
+    </header>
+
+    <div class="container">
+        <div class="display-section">
+            <canvas id="starCanvas"></canvas>
+        </div>
+
+        <div class="panel-section">
+            <div class="archive-box">
+                <div class="archive-title">STATION DATA</div>
+                <ul class="data-list" id="dataList">
+                    <li class="data-item"><span class="data-label">SYSTEM STATUS</span><span class="data-value" style="color:var(--hud-cyan);">INITIALIZING...</span></li>
+                </ul>
+            </div>
+            <div class="footer-note" id="envNote">
+                ** NOTE: SYSTEM RUNNING VIA DYNAMIC CONFIG SPECIFICATION.
+            </div>
+        </div>
+    </div>
+
+    <script src="draw.js"></script>
+    <script>
+        const canvas = document.getElementById('starCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const backupData = {
+            "name": "人马座ζAa / 斗宿六Aa (本地缓存)",
+            "alias": "Ascella",
+            "type": "主序星",
+            "spectral": "A2.5Va",
+            "mass": "2.2 M☉",
+            "luminosity": "31 L☉",
+            "demo_radius": "1.3 R☉",
+            "demo_color": "A 蓝白",
+            "demo_oblateness": "0.00 (正圆)",
+            "visual_config": {
+                "scale": 0.9,
+                "oblateness": 0,
+                "core_color_center": "#ffffff",
+                "core_color_mid": "#f0f5ff",
+                "core_color_edge": "#b8d2ff",
+                "glow_color": "rgba(0, 100, 255, 0.35)"
+            }
+        };
+
+        // 将配置挂载给全局控制桥梁，供 draw.js 的动画循环捕捉
+        window.currentActiveConfig = backupData.visual_config;
+
+        // 核心控制器：加载并重构面板
+        async function runEngine() {
+            let data = backupData;
+            const envNote = document.getElementById('envNote');
+
+            try {
+                // 尝试捕获同级目录下的真实 JSON
+                const response = await fetch('markab.json');
+                data = await response.json();
+                envNote.innerText = "** STATUS: REMOTE HTTP JSON TARGET EXTRACTED SUCCESSFULLY.";
+            } catch (corsError) {
+                envNote.innerText = "** STATUS: LOCAL FILE DETECTION (CORS ACTIVE). USING INTERNALLY PROTECTED ARCHIVE SPEC.";
+                envNote.style.color = "rgba(0, 243, 255, 0.5)";
+            }
+
+            // 动态注入参数栏
+            const dataList = document.getElementById('dataList');
+            dataList.innerHTML = `
+                <li class="data-item"><span class="data-label">NAME</span><span class="data-value" style="color: var(--hud-cyan);">${data.name}</span></li>
+                <li class="data-item"><span class="data-label">ALIAS</span><span class="data-value">${data.alias}</span></li>
+                <li class="data-item"><span class="data-label">TYPE</span><span class="data-value">${data.type}</span></li>
+                <li class="data-item"><span class="data-label">SPECTRAL</span><span class="data-value">${data.spectral}</span></li>
+                <li class="data-item"><span class="data-label">MASS</span><span class="data-value">${data.mass}</span></li>
+                <li class="data-item"><span class="data-label">LUMINOSITY</span><span class="data-value">${data.luminosity}</span></li>
+                <li class="data-item"><span class="data-label"><span class="demo-tag">DEMO</span>COLOR</span><span class="data-value" style="color: ${data.visual_config.core_color_edge};">${data.demo_color}</span></li>
+            `;
+
+            window.currentActiveConfig = data.visual_config;
+            resizeAndRedraw();
+            
+            // 初始化星空粒子并踢入循环机制
+            initBackgroundStars();
+            animationEngineLoop();
+        }
+
+        function resizeAndRedraw() {
+            const size = Math.min(canvas.parentElement.clientWidth, canvas.parentElement.clientHeight) * 0.8;
+            canvas.width = size;
+            canvas.height = size;
+        }
+
+        // 绑定流
+        window.addEventListener('resize', () => {
+            resizeAndRedraw();
+            initBackgroundStars(); // 改变大小时重置粒子，防止瞬移断层
+        });
+        
+        runEngine();
+    </script>
+</body>
+</html>
